@@ -16,6 +16,7 @@ import logging
 
 from .. import Phase
 from .constants import CONSUME_FUEL_CATEGORY_TRANSLATIONS
+from .importer import SPECIES_TRANSLATION
 from .mappers import (
     Fccs2CoverType,
     CoverType2EfGroup,
@@ -133,6 +134,7 @@ class BaseLookUp(object, metaclass=abc.ABCMeta):
         fuel_category = kwargs.get('fuel_category')
         fuel_sub_category = kwargs.get('fuel_sub_category')
         species = kwargs.get('species')
+        species = SPECIES_TRANSLATION.get(species) or species
 
         override_ef_group = -1
         if self.region:
@@ -279,6 +281,7 @@ class CoverType2SeraEf(CoverType2Ef):
         fuel_category = kwargs.get('fuel_category')
         fuel_sub_category = kwargs.get('fuel_sub_category')
         species = kwargs.get('species')   #pollutant
+        species = SPECIES_TRANSLATION.get(species) or species
         stat = kwargs.get('stat')
         if not stat:
             stat = "EF"
@@ -307,8 +310,12 @@ class CoverType2SeraEf(CoverType2Ef):
         # if ok, return stat from ef_set
         subset_by_phase = self.sera_ef_set.get(phase)
 
-        # if subset_by_phase is None, use "average". Example: fuelbed 1 (cover type 13, W mixed forest) doesn't have "smoldering" phase.
-        if not subset_by_phase:
+        # if subset_by_phase is None, or if subset_by_phase doesn't have
+        # data for the pollutant species, then use "average".
+        # Example: fuelbed 1 (cover type 13, W mixed forest) doesn't have "smoldering" phase.
+        # Note that "average" may also not have the species, in which case
+        # we'll fall back on calling the base class' `get` if stat='EF'
+        if not subset_by_phase or species not in subset_by_phase:
             subset_by_phase = self.sera_ef_set.get("average")
 
         subset_by_pollutant = subset_by_phase.get(species)

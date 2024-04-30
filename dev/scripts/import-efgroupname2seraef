@@ -1,0 +1,115 @@
+#!/usr/bin/env python
+
+"""import-fccs2ef.py:
+"""
+
+__author__      = "Joel Dubowy"
+
+import csv
+import json
+import logging
+import os
+import sys
+import traceback
+from collections import defaultdict
+
+from afscripting import (
+    args as scripting_args,
+    utils as scripting_utils
+)
+
+from eflookup.fccs2ef.importer import SPECIES_TRANSLATION
+
+REQUIRED_OPTIONS = []
+
+OPTIONAL_OPTIONS = [
+    {
+        'long': "--group-name-to-ef-csv",
+        'help': "csv containing group name eto EF mappings",
+        'metavar': "FILE",
+        'default': "./input-data/orig-efgroupname2seraef.csv"
+    }
+]
+EXAMPLES_STRING = f"""
+Example calls:
+ $ {sys.argv[0]} --log-level=DEBUG
+ """
+
+PHASE_KEYS = {
+    'FireAvg': 'average',
+    'F': 'flaming',
+    'S': 'smoldering'
+}
+
+def parseEf(v, default):
+    try:
+        return float(v)
+    except:
+        # e.g. empty string
+        return float(default)
+
+def main():
+    parser, args = scripting_args.parse_args(REQUIRED_OPTIONS,
+        OPTIONAL_OPTIONS, epilog=EXAMPLES_STRING)
+
+    try:
+        # fire_avg will store the FireAvg EF values for all polutants for the
+        # curent Region and VegType. These values will be used when flaming
+        # or smoldering have no EF value.
+        # We'll record the FireAvg values on the first pass through the data,
+        # and then do a second pass for the rest, in case the flaming or
+        # smoldering values come before the FireAvg values.
+        fire_avg = {}
+        rows = []
+        with open(args.group_name_to_ef_csv, encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                row = {k: v.strip() for k,v in row.items()}
+                rows.append(row)
+                row['Pollutant'] = SPECIES_TRANSLATION.get(row['Pollutant']) or row['Pollutant']
+
+                if row['Phase'] == 'FireAvg':
+                    fire_avg[row['Pollutant']] = row['EF']
+
+        data = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: {})))
+        csvData = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: {})))
+
+        for row in rows:
+            phase_key = PHASE_KEYS[row['Phase']]
+            v = {
+                'EF': parseEf(row['EF'], fire_avg[row['Pollutant']]),
+                'SD': parseEf(row['SD'], 0),
+                'n': parseEf(row['n'], 0),
+            }
+            data[row['Region']][row['VegType']][phase_key][row['Pollutant']] = v
+            csvData[row['Region']][row['VegType']][phase_key][row['Pollutant']] = (
+                dict(v, citeShort=row['citeShort']))
+
+        output_file_name = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+            'eflookup', 'fccs2ef', 'data', 'efgroupname2seraef.py')
+        with open(output_file_name, 'w') as f:
+            json_data = json.dumps(data,separators=(',', ':'))
+            f.write(f'EF_GROUP_NAME_2_SERA_EF={json_data}')
+
+        with open(output_file_name.replace('.py', '.csv'), 'w') as csvfile:
+            fieldnames = ['regionname','efgroupname','phase','species','EF','SD','n', 'citeShort']
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            for regionname in sorted(csvData):
+                for efgroupname in sorted(csvData[regionname]):
+                    for phase in sorted(csvData[regionname][efgroupname]):
+                        for species in sorted(csvData[regionname][efgroupname][phase]):
+                            writer.writerow(dict(
+                                regionname=regionname,
+                                efgroupname=efgroupname,
+                                phase=phase,
+                                species=species,
+                                **csvData[regionname][efgroupname][phase][species]
+                            ))
+
+    except Exception as e:
+        scripting_utils.exit_with_msg(str(e) + '\n\n' + traceback.format_exc())
+
+if __name__ == "__main__":
+    main()

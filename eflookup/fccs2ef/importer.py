@@ -19,6 +19,7 @@ from collections import OrderedDict
 from .constants import CONSUME_FUEL_CATEGORY_TRANSLATIONS
 
 __all__ = [
+    'SPECIES_TRANSLATION',
     'Fccs2CoverTypeImporter',
     'CoverType2EfGroupImporter',
     'CatPhase2EFGroupImporter',
@@ -63,6 +64,10 @@ class ImporterBase(object):
     def _data_variable_name(self):
         pass
 
+    @abc.abstractmethod
+    def _write_csv(self, csv_output_file_name):
+        pass
+
     def _write_ordered_data(self, data, f):
         # This is done so that the data python modules don't
         # change from one run of the import process to the next
@@ -90,6 +95,15 @@ class ImporterBase(object):
             #  `None` values to `null`
             f.write('{} = '.format(self._data_variable_name()))
             self._write_ordered_data(self._data, f)
+            self._write_csv(output_file_name.replace('.py', '.csv'))
+
+def _sortable_fccs_id(fccs_id):
+    # some FCCS Ids are numeric (e.g. '52') and some are alphanumeric
+    # (e.g. 'globalFCCS1010'). Zero pad numeric ones so that they are
+    # ordered correctly
+    if fccs_id.isnumeric():
+        return '0' * (10-len(fccs_id)) + fccs_id
+    return fccs_id
 
 ##
 ## Fccs2CoverType
@@ -122,6 +136,17 @@ class Fccs2CoverTypeImporter(ImporterBase):
     def _data_variable_name(self):
         return 'FCCS_2_COVERTYPE'
 
+    def _write_csv(self, csv_output_file_name):
+        with open(csv_output_file_name, 'w') as csvfile:
+            fieldnames = ['fccs_id','covertype']
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            for fccs_id, covertype in sorted(self._data.items(),
+                    key=lambda e: _sortable_fccs_id(e[0])):
+                writer.writerow(dict(
+                    fccs_id=fccs_id,
+                    covertype=covertype
+                ))
 
 ##
 ## CoverType2EfGroup
@@ -154,10 +179,27 @@ class CoverType2EfGroupImporter(ImporterBase):
     def _data_variable_name(self):
         return 'COVERTYPE_2_EF_GROUP'
 
+    def _write_csv(self, csv_output_file_name):
+        with open(csv_output_file_name, 'w') as csvfile:
+            fieldnames = ['covertype','phase','efgroup']
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            for covertype in sorted(self._data, key=lambda e: _sortable_fccs_id(e)):
+                for phase, efgroup in sorted(self._data[covertype].items(), key=lambda e: e[0]):
+                    writer.writerow(dict(
+                        covertype=covertype,
+                        phase=phase,
+                        efgroup=efgroup
+                    ))
+
 
 ##
 ## CatPhase2EFGroup
 ##
+
+SPECIES_TRANSLATION = {
+    'PM25': 'PM2.5'
+}
 
 class CatPhase2EFGroupImporter(ImporterBase):
     """CatPhase2EFGroupImporter: imports regional EF group assignments
@@ -246,10 +288,6 @@ class CatPhase2EFGroupImporter(ImporterBase):
         self._process_second_header_row(csv_reader)
         self._combine_header_rows()
 
-    SPECIES_TRANSLATION = {
-        'PM25': 'PM2.5'
-    }
-
     def _process_row(self, row):
         row = [row[i+self.FIRST_COL_IDX]
             for i in range(len(self._headers)+len(self._col_idxs_to_skip))
@@ -271,7 +309,7 @@ class CatPhase2EFGroupImporter(ImporterBase):
                 self._data[reg][cat][sub_cat] = self._data[reg][cat].get(
                     sub_cat, {})
                 self._data[reg][cat][sub_cat][phase] = {
-                    self.SPECIES_TRANSLATION.get(s, s): row[i] or None for s in species
+                    SPECIES_TRANSLATION.get(s, s): row[i] or None for s in species
                 }
 
     # extracts number range (e.g. "General (1-6)" -> '1-6')
@@ -302,6 +340,27 @@ class CatPhase2EFGroupImporter(ImporterBase):
     def _data_variable_name(self):
         return 'CAT_PHASE_2_EF_GROUP'
 
+    def _write_csv(self, csv_output_file_name):
+        with open(csv_output_file_name, 'w') as csvfile:
+            fieldnames = [
+                'region','fuelcat','fuelsubcat',
+                'phase','species','efgroup'
+            ]
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            for region in sorted(self._data):
+                for fuelcat in sorted(self._data[region]):
+                    for fuelsubcat in sorted(self._data[region][fuelcat]):
+                        for phase in sorted(self._data[region][fuelcat][fuelsubcat]):
+                            for species, efgroup in self._data[region][fuelcat][fuelsubcat][phase].items():
+                                writer.writerow(dict(
+                                    region=region,
+                                    fuelcat=fuelcat,
+                                    fuelsubcat=fuelsubcat,
+                                    phase=phase,
+                                    species=species,
+                                    efgroup=efgroup
+                                ))
 
 ##
 ## EfGroup2Ef
@@ -339,3 +398,16 @@ class EfGroup2EfImporter(ImporterBase):
 
     def _data_variable_name(self):
         return 'EF_GROUP_2_EF'
+
+    def _write_csv(self, csv_output_file_name):
+        with open(csv_output_file_name, 'w') as csvfile:
+            fieldnames = ['efgroup','species','ef']
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            for efgroup in sorted(self._data, key=lambda e: _sortable_fccs_id(e)):
+                for species, ef in sorted(self._data[efgroup].items(), key=lambda e: e[0]):
+                    writer.writerow(dict(
+                        efgroup=efgroup,
+                        species=species,
+                        ef=ef
+                    ))
