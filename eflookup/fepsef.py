@@ -88,6 +88,11 @@ Here's the python emission factor generation logic:
 
 There's no need to compute EFS more than once, since it's static, so we
 computed it manually and hardcoded EFS.
+
+Note on units:  Though the FEPS user guide lists g/kg as the units of the EFs
+(https://www.frames.gov/documents/usfs/fera/FEPS_users_guide.pdf,
+page 62, equation 33), the EFs in this code base are in g/g (or kg/kg,
+ton/ton, etc., basically preserving the units of consumption).
 """
 
 __author__      = "Joel Dubowy"
