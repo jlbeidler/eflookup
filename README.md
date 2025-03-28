@@ -5,7 +5,7 @@ emissions from wildland fires.  Multiple sets of EF are supported, including:
 
  - FCCS specific EFs, based on Prichard, S.J. and O'Neill, S. In prep. Wildland fire EFs in North America: summary of existing data, measurement needs and management applications. International Journal of Wildland Fire.
  - FEPS style EFs
- - Crop-specific EFs from Pouliot 2017 and McCarty 2011
+ - Crop-specific EFs from Pouliot 2017, McCarty 2011, Hall 2023
 
 ***This software is provided for research purposes only. It's output may
 not accurately reflect observed data due to numerous reasons. Data are
