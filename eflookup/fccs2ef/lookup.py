@@ -210,7 +210,9 @@ class BaseLookUp(object, metaclass=abc.ABCMeta):
 
 class Fccs2Ef(BaseLookUp):
 
-    def __init__(self, fccs_fuelbed_id, is_rx):
+    def __init__(self, fccs_fuelbed_id, fuelbed_region, is_rx):
+        if fuelbed_region.lower().strip() == 'global':  
+            fccs_fuelbed_id = f'globalFCCS{fccs_fuelbed_id}'
         self.fccs_fuelbed_id = str(fccs_fuelbed_id)
         super().__init__(is_rx)
 
@@ -346,7 +348,11 @@ class CoverType2SeraEf(CoverType2Ef):
 
 class Fccs2SeraEf(CoverType2SeraEf):
 
-    def __init__(self, fccs_fuelbed_id, is_rx=True):
+    def __init__(self, fccs_fuelbed_id, fuelbed_region, is_rx=True):
+
+        if fuelbed_region.lower().strip() == 'global':  
+            fccs_fuelbed_id = f'globalFCCS{fccs_fuelbed_id}'
+
         self.fccs_fuelbed_id = str(fccs_fuelbed_id)
 
         # Fuelbed to Cover Type (fuel bed 0 => cover type 404)
