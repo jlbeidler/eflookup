@@ -1,0 +1,3 @@
+28 Jan 2026: Christine Allen relinked efgroup2ef.py to point to efgroup2ef_nmoc.py,
+for the purposes of USA run 2 sensitivity 2 (use updated NMOG emission factors).
+Previously, for USA run 2 sensitivity 1, efgroup2ef.py was linked to efgroup2ef_orig_subset.py.
